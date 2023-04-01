@@ -8,3 +8,7 @@
 .idea/other.xml
 .idea
 .venv
+
+# Large Datasets
+data/soc-redditHyperlinks-body.tsv
+data/soc-redditHyperlinks-body.csv
