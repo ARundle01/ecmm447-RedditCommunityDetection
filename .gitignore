@@ -8,7 +8,13 @@
 .idea/other.xml
 .idea
 .venv
+.ipynb_checkpoints
 
 # Large Datasets
 data/soc-redditHyperlinks-body.tsv
 data/soc-redditHyperlinks-body.csv
+data/soc-redditHyperlinks-title.tsv
+data/soc-redditHyperlinks-title.csv
+
+# Output Images
+out/*
