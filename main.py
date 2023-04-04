@@ -1,19 +1,34 @@
-import networkx
 import numpy as np
+from collections import Counter
+
+# Pandas Imports
 import pandas
 import pandas as pd
+
+# Matplotlib Imports
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 
+# NetworkX Imports
 import networkx as nx
+from networkx.algorithms import community as comm
+
+# Imports for Downloading TSV
 import urllib.request as req
 import os.path as path
-import igraph
 
+# Datashader Imports
+import colorcet as cc
+import datashader as ds
+import datashader.transfer_functions as tf
+from datashader.layout import circular_layout, forceatlas2_layout
+from datashader.bundling import directly_connect_edges, hammer_bundle
+from datashader.utils import export_image
+
+from itertools import chain
 import community
 
-from collections.abc import Iterable
-from networkx.algorithms import community as comm
+
 
 
 def _download_tsv():
@@ -140,13 +155,13 @@ def make_unweighted(df):
     return G
 
 
-def make_weighted(df: pandas.DataFrame) -> networkx.classes.graph.Graph:
+def make_weighted(df: pandas.DataFrame) -> nx.classes.graph.Graph:
     G = nx.from_pandas_edgelist(df, 'SOURCE_SUBREDDIT', 'TARGET_SUBREDDIT', ['WEIGHT'])
 
     return G
 
 
-def perform_louvain(graph: networkx.classes.graph.Graph, resolution: float = 1.0) -> list:
+def perform_louvain(graph: nx.classes.graph.Graph, resolution: float = 1.0) -> list:
     print("Performing Louvain Community Detection...")
     louvain = comm.louvain_communities(graph, weight='WEIGHT', resolution=resolution)
 
@@ -154,7 +169,7 @@ def perform_louvain(graph: networkx.classes.graph.Graph, resolution: float = 1.0
     return louvain
 
 
-def perform_girvan(graph: networkx.classes.graph.Graph):
+def perform_girvan(graph: nx.classes.graph.Graph):
     print("Performing Girvan-Newman Community Detection...")
     girvan = comm.girvan_newman(graph)
 
@@ -170,7 +185,7 @@ def draw_clu(graph, position, labels, algorithm, savename):
                                    node_color=list(labels.values()),
                                    nodelist=list(labels.keys()))
 
-    graph_labels = nx.draw_networkx_labels(graph, position, font_size=9)
+    graph_labels = nx.draw_networkx_labels(graph, position, font_size=1)
 
     edges = nx.draw_networkx_edges(graph, position, alpha=0.5)
 
@@ -187,6 +202,32 @@ def draw_clu(graph, position, labels, algorithm, savename):
     plt.savefig(savename)
 
 
+cvsopts = dict(plot_height=1200, plot_width=1200)
+
+
+def nodes_plot(nodes, name=None, canvas=None, cat=None):
+    canvas = ds.Canvas(**cvsopts) if canvas is None else canvas
+    aggregator = None if cat is None else ds.count_cat(cat)
+    agg = canvas.points(nodes, 'x', 'y', aggregator)
+    return tf.spread(tf.shade(agg, cmap=["#FF3333"]), px=3, name=name)
+
+
+def edges_plot(edges, name=None, canvas=None):
+    canvas = ds.Canvas(**cvsopts) if canvas is None else canvas
+    return tf.shade(canvas.line(edges, 'x', 'y', agg=ds.count()), name=name)
+
+
+def graph_plot(nodes, edges, name="", canvas=None, cat=None):
+    if canvas is None:
+        xr = nodes.x.min(), nodes.x.max()
+        yr = nodes.y.min(), nodes.y.max()
+        canvas = ds.Canvas(x_range=xr, y_range=yr, **cvsopts)
+
+    np = nodes_plot(nodes, name + " nodes", canvas, cat)
+    ep = edges_plot(edges, name + " edges", canvas)
+    return tf.stack(ep, np, how="over", name=name)
+
+
 if __name__ == '__main__':
     _download_tsv()
 
@@ -197,7 +238,6 @@ if __name__ == '__main__':
 
     reddit_csv = "./data/redditHyperlinks-subredditsOnly.csv"
     reddit_df = load_df(reddit_csv)
-
     more_than_one_df = reddit_df[reddit_df['WEIGHT'] > 1]
     more_than_two_df = more_than_one_df[more_than_one_df['WEIGHT'] > 2]
 
@@ -206,9 +246,72 @@ if __name__ == '__main__':
 
     # unweighted = make_unweighted(reddit_df)
     # unweighted_df = nx.to_pandas_edgelist(unweighted)
-    reddit = make_weighted(reddit_df)
-    more_than_one = make_weighted(more_than_one_df)
-    more_than_two = make_weighted(more_than_two_df)
+    # reddit = make_weighted(reddit_df)
+    # more_than_one = make_weighted(more_than_one_df)
+    # more_than_two = make_weighted(more_than_two_df)
+
+    unique = pd.concat([reddit_df["SOURCE_SUBREDDIT"], reddit_df["TARGET_SUBREDDIT"]]).unique()
+
+    nodes = pd.DataFrame({'name': unique})
+
+    nodes_dict = {name: idx for idx, name in enumerate(nodes['name'])}
+
+    edges = reddit_df.copy()
+
+    edges['source'] = edges['SOURCE_SUBREDDIT'].map(nodes_dict)
+    edges['target'] = edges['TARGET_SUBREDDIT'].map(nodes_dict)
+    edges['weight'] = edges['WEIGHT']
+
+    edges.drop(columns=["SOURCE_SUBREDDIT", "TARGET_SUBREDDIT", "WEIGHT"], inplace=True)
+
+    # circular = circular_layout(nodes, uniform=False)
+    # forcedirected = forceatlas2_layout(nodes, edges)
+
+    # cd = graph_plot(circular, directly_connect_edges(circular, edges), "Circular Layout")
+    # fd = graph_plot(forcedirected, directly_connect_edges(forcedirected, edges), "Force-Directed")
+
+    # cd_b = graph_plot(circular, hammer_bundle(circular, edges), "Bundled Circular Layout")
+    # fd_b = graph_plot(forcedirected, hammer_bundle(forcedirected, edges, weight='weight'), "Bundled Force-Directed")
+
+    # unweighted_graph = nx.from_pandas_edgelist(edges, source='source', target='target', create_using=nx.Graph)
+    # weighted_graph = nx.from_pandas_edgelist(edges, source='source', target='target', edge_attr=['weight'], create_using=nx.Graph)
+    # directed_graph = nx.from_pandas_edgelist(edges, source='source', target='target', edge_attr=['weight'], create_using=nx.DiGraph)
+
+    # export_image(cd_b, "./out/circle_bundled")
+
+    weighted = nx.from_pandas_edgelist(edges, 'source', 'target', ['weight'])
+    print(f"Number of Nodes: {nx.number_of_nodes(weighted)}")
+
+    # Get all connected components
+    connected_components = list(nx.connected_components(weighted))
+    print(len(connected_components))
+
+    # Get sizes of connected components
+    component_sizes = [len(c) for c in connected_components]
+    size_counts = Counter(component_sizes)
+
+    size_labels = size_counts.keys()
+
+    # Plot histogram
+    plt.xticks(range(len(size_counts.values())), size_labels)
+    plt.xlabel('Size of Connected Components')
+    plt.ylabel('Frequency')
+    plt.title('Histogram of Connected Component Sizes')
+    plt.bar(range(len(size_counts.values())), size_counts.values(), color='royalblue')
+    plt.grid(color='#95a5a6', linestyle='--', linewidth=2, axis='y')
+
+    # Print list of actual numbers
+    for key, value in size_counts.items():
+        if value == 1:
+            print(f"There is {value} component that contains {key} nodes.")
+        else:
+            print(f"There are {value} components that contain {key} nodes.")
+
+    plt.savefig("./out/hist.png")
+
+    # edges = more_than_two_df.drop(columns=['SOURCE_SUBREDDIT', 'TARGET_SUBREDDIT', 'WEIGHT'])
+
+    # mtt = make_unweighted(more_than_two_df)
 
     # all_neighbours = nx.all_neighbors(weighted, "destinythegame")
     # neigh_list = []
@@ -228,17 +331,17 @@ if __name__ == '__main__':
     # destinygraph = make_unweighted(destiny_df)
 
     # pos = nx.spring_layout(weighted, weight='WEIGHT')
-    labels_reddit = community.best_partition(reddit)
-    labels_mto = community.best_partition(more_than_one)
-    labels_mtt = community.best_partition(more_than_two)
+    # labels_reddit = community.best_partition(reddit)
+    # labels_mto = community.best_partition(more_than_one)
+    # labels_mtt = community.best_partition(more_than_two)
 
-    pos = nx.spring_layout(more_than_two, weight='WEIGHT')
+    # pos = nx.circular_layout(more_than_two)
 
     # for key, value in labels_louvain.items():
     #     if key == "destinythegame":
     #         print(value)
 
-    draw_clu(more_than_two, pos, labels_mtt, 'Louvain', savename='./out/louvain_mtt.png')
+    # draw_clu(more_than_two, pos, labels_mtt, 'Louvain', savename='./out/louvain_circle.png')
 
     # girvan = perform_girvan(weighted)
     # print("Performing Girvan-Newman Community Detection...")
