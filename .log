@@ -1,0 +1,30 @@
+This is XeTeX, Version 3.141592653-2.6-0.999994 (MiKTeX 22.3) (preloaded format=xelatex 2023.4.8)  8 APR 2023 19:40
+entering extended mode
+ restricted \write18 enabled.
+ %&-line parsing enabled.
+**^^X
+(C:\Users\aorun\AppData\Local\Programs\MiKTeX\tex/latex/tools\.tex
+LaTeX2e <2021-11-15> patch level 1
+L3 programming layer <2023-03-30> File ignored)
+*
+(Please type a command or say `\end')
+*\end#
+! Interruption.
+<*> 
+    \end#
+? \end
+Type <return> to proceed, S to scroll future error messages,
+R to run without stopping, Q to run quietly,
+I to insert something, 
+H for help, X to quit.
+? X
+ 
+Here is how much of TeX's memory you used:
+ 14 strings out of 411799
+ 324 string characters out of 2826297
+ 1842098 words of memory out of 3000000
+ 20017 multiletter control sequences out of 15000+600000
+ 512287 words of font info for 32 fonts, out of 8000000 for 9000
+ 1348 hyphenation exceptions out of 8191
+ 13i,0n,12p,81b,10s stack positions out of 10000i,1000n,20000p,200000b,80000s
+No pages of output.
